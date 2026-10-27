@@ -1,30 +1,50 @@
-module prog_loader (
-    input        clk,
-    input        rst_n,
-    input  [7:0] prog_data,
-    input        prog_load,
-    input        run,
-    output       write_en,
-    output [2:0] write_addr,
-    output [7:0] write_data
+module prog_loader(
+    /*
+        This module is used to load the program into the memory. It does so by using a data stream of 8 bit data and a load pulse.
+    */
+    input wire clk,
+    input wire rst_n,
+    input wire i_prog_load,
+    input wire i_run,
+    output wire [2:0] o_load_addr,
+    output wire o_write_en
 );
+    
 
-reg       pl_q;
+/* A
+    == load_pulse == 
+        - In case the i_prog_load is high for multiple cycle, you want to avoid load the same data multiple times. 
+        So, we use a register pl_q to store the previous state of i_prog_load.
+        load_pulse is asserted, on the first instance, and in further case, if the previous state and current state are same, load_pulse becomes low. 
+        - This loads the data only once. 
+*/
+
+
+reg pl_q;
+
+always @(posedge clk) begin
+    pl_q <= i_prog_load;
+end
+
+wire load_pulse;
+
+assign load_pulse = i_prog_load & ~pl_q & ~i_run; //A 
+
+
+//B (an address counter that ticks at rising edge of load_pulse)
+
 reg [2:0] load_addr;
 
-always @(posedge clk)
-    pl_q <= prog_load;
-
-wire load_pulse = prog_load & ~pl_q & ~run;
-
-always @(posedge clk)
-    if (!rst_n)
+always @(posedge clk) begin
+    if(rst_n == 0) begin
         load_addr <= 3'b000;
-    else if (load_pulse)
+    end else if(load_pulse) begin
         load_addr <= load_addr + 1;
+    end
+end //B
 
-assign write_en   = load_pulse;
-assign write_addr = load_addr;
-assign write_data = prog_data;
 
-endmodule
+assign o_load_addr = load_addr; //wasnt sure how to increment the address directly, so used a register and incremented it and then assigned it to the output.
+assign o_write_en = load_pulse;
+
+endmodule //prog_loader
